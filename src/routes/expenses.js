@@ -142,7 +142,8 @@ router.get('/', authenticate, async (req, res) => {
     if (from) query = query.where('expenses.date', '>=', from);
     if (to) query = query.where('expenses.date', '<=', to);
 
-    const [{ count: total }] = await query.clone().count('* as count');
+    const countQuery = query.clone().clearSelect().clearOrder();
+    const [{ count: total }] = await countQuery.count('* as count');
     const expenses = await query.offset(offset).limit(limit);
 
     // Attach files to each expense (check both expense_id and entity columns)

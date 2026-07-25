@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { authenticate, authorize } = require('../middleware/auth');
+const { strftimeMonth } = require('../utils/dbCompat');
 
 const router = express.Router();
 
@@ -22,7 +23,7 @@ router.get('/', authenticate, authorize('admin', 'accounts_head'), async (req, r
     const spending = headIds.length
       ? await db('expenses')
           .where('expenses.status', 'approved')
-          .whereRaw("strftime('%Y-%m', expenses.date) = ?", [currentMonth])
+          .whereRaw(`${strftimeMonth('expenses.date')} = ?`, [currentMonth])
           .whereIn('expenses.head_id', headIds)
           .select('expenses.head_id', db.raw('SUM(expenses.amount) as spent'))
           .groupBy('expenses.head_id')

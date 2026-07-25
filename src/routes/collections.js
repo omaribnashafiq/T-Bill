@@ -72,7 +72,8 @@ router.get('/', authenticate, async (req, res) => {
     if (from) query = query.where('collections.date', '>=', from);
     if (to) query = query.where('collections.date', '<=', to);
 
-    const [{ count: total }] = await query.clone().count('* as count');
+    const countQuery = query.clone().clearSelect().clearOrder();
+    const [{ count: total }] = await countQuery.count('* as count');
     const collections = await query.offset(offset).limit(limit);
 
     res.json({ collections, total: Number(total), page: Number(page), limit: Number(limit) });

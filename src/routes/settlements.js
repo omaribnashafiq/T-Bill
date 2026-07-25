@@ -74,7 +74,8 @@ router.get('/', authenticate, async (req, res) => {
     if (from) query = query.where('daily_settlements.date', '>=', from);
     if (to) query = query.where('daily_settlements.date', '<=', to);
 
-    const [{ count: total }] = await query.clone().count('* as count');
+    const countQuery = query.clone().clearSelect().clearOrder();
+    const [{ count: total }] = await countQuery.count('* as count');
     const settlements = await query.offset(offset).limit(limit);
 
     res.json({ settlements, total: Number(total), page: Number(page), limit: Number(limit) });

@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { authenticate, authorize } = require('../middleware/auth');
+const { strftimeYear, strftimeMonthNum } = require('../utils/dbCompat');
 
 const router = express.Router();
 
@@ -168,16 +169,16 @@ router.get('/monthly-summary', authenticate, authorize('admin'), async (req, res
     let query = db('expenses')
       .leftJoin('users', 'expenses.created_by', 'users.id')
       .leftJoin('expense_heads', 'expenses.head_id', 'expense_heads.id')
-      .whereRaw("strftime('%Y', expenses.date) = ?", [String(targetYear)])
+      .whereRaw(`${strftimeYear('expenses.date')} = ?`, [String(targetYear)])
       .where('expenses.status', 'approved')
       .select(
         'users.name as employee',
         'expense_heads.name as category',
-        db.raw("strftime('%m', expenses.date) as month"),
+        db.raw(`${strftimeMonthNum('expenses.date')} as month`),
         db.raw('SUM(expenses.amount) as total_amount'),
         db.raw('COUNT(*) as expense_count')
       )
-      .groupBy('expenses.created_by', 'expenses.head_id', db.raw("strftime('%m', expenses.date)"))
+      .groupBy('expenses.created_by', 'expenses.head_id', db.raw(`${strftimeMonthNum('expenses.date')}`))
       .orderBy('users.name', 'asc');
 
     if (employee_id) query = query.where('expenses.created_by', employee_id);

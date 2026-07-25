@@ -22,7 +22,8 @@ router.get('/', authenticate, authorize('admin', 'accounts_head'), async (req, r
     if (from) query = query.where('audit_log.created_at', '>=', from);
     if (to) query = query.where('audit_log.created_at', '<=', to);
 
-    const [{ count: total }] = await query.clone().count('* as count');
+    const countQuery = query.clone().clearSelect().clearOrder();
+    const [{ count: total }] = await countQuery.count('* as count');
     const logs = await query.offset(offset).limit(limit);
 
     // Parse details JSON

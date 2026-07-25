@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { authenticate } = require('../middleware/auth');
+const { strftimeMonth, strftimeYear, strftimeMonthNum } = require('../utils/dbCompat');
 
 const router = express.Router();
 
@@ -37,7 +38,7 @@ async function adminDashboard() {
     );
 
   const [monthExpenses] = await db('expenses')
-    .whereRaw("strftime('%Y-%m', date) = ?", [thisMonth])
+    .whereRaw(`${strftimeMonth('date')} = ?`, [thisMonth])
     .select(
       db.raw('COUNT(*) as count'),
       db.raw('COALESCE(SUM(amount), 0) as amount')
@@ -63,10 +64,9 @@ async function adminDashboard() {
   const [userStats] = await db('users')
     .select(
       db.raw('COUNT(*) as total'),
-      db.raw("SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) as active")
+      db.raw("SUM(CASE WHEN is_active = true THEN 1 ELSE 0 END) as active")
     );
 
-  // Recent expenses
   const recentExpenses = await db('expenses')
     .leftJoin('users', 'expenses.created_by', 'users.id')
     .leftJoin('expense_heads', 'expenses.head_id', 'expense_heads.id')
@@ -74,10 +74,9 @@ async function adminDashboard() {
     .orderBy('expenses.created_at', 'desc')
     .limit(5);
 
-  // Category breakdown (this month)
   const categoryBreakdown = await db('expenses')
     .leftJoin('expense_heads', 'expenses.head_id', 'expense_heads.id')
-    .whereRaw("strftime('%Y-%m', expenses.date) = ?", [thisMonth])
+    .whereRaw(`${strftimeMonth('expenses.date')} = ?`, [thisMonth])
     .where('expenses.status', 'approved')
     .select('expense_heads.name as head_name')
     .sum('expenses.amount as total')
@@ -97,8 +96,6 @@ async function adminDashboard() {
 }
 
 async function accountsHeadDashboard(userId) {
-  const today = new Date().toISOString().split('T')[0];
-
   const pendingExpenses = await db('expenses')
     .where('status', 'pending')
     .select(db.raw('COUNT(*) as count'), db.raw('COALESCE(SUM(amount), 0) as amount'))
@@ -114,7 +111,6 @@ async function accountsHeadDashboard(userId) {
     .count('* as count')
     .first();
 
-  // My expenses
   const myExpenses = await db('expenses')
     .where('created_by', userId)
     .select(
@@ -123,7 +119,6 @@ async function accountsHeadDashboard(userId) {
     )
     .first();
 
-  // Pending list for review
   const pendingExpensesList = await db('expenses')
     .leftJoin('users', 'expenses.created_by', 'users.id')
     .leftJoin('expense_heads', 'expenses.head_id', 'expense_heads.id')
@@ -156,7 +151,7 @@ async function employeeDashboard(userId) {
 
   const [monthExpenses] = await db('expenses')
     .where('created_by', userId)
-    .whereRaw("strftime('%Y-%m', date) = ?", [thisMonth])
+    .whereRaw(`${strftimeMonth('date')} = ?`, [thisMonth])
     .select(db.raw('COUNT(*) as count'), db.raw('COALESCE(SUM(amount), 0) as amount'));
 
   const [settlementStats] = await db('daily_settlements')
@@ -171,7 +166,6 @@ async function employeeDashboard(userId) {
     .where({ employee_id: userId, date: today })
     .first();
 
-  // Recent expenses
   const recentExpenses = await db('expenses')
     .leftJoin('expense_heads', 'expenses.head_id', 'expense_heads.id')
     .where('expenses.created_by', userId)
@@ -188,7 +182,7 @@ async function employeeDashboard(userId) {
   };
 }
 
-// GET /api/dashboard/reports/monthly — monthly summary report
+// GET /api/dashboard/reports/monthly
 router.get('/reports/monthly', authenticate, async (req, res) => {
   try {
     const { year, employee_id } = req.query;
@@ -197,24 +191,23 @@ router.get('/reports/monthly', authenticate, async (req, res) => {
     let query = db('expenses')
       .leftJoin('users', 'expenses.created_by', 'users.id')
       .leftJoin('expense_heads', 'expenses.head_id', 'expense_heads.id')
-      .whereRaw("strftime('%Y', expenses.date) = ?", [String(targetYear)])
+      .whereRaw(`${strftimeYear('expenses.date')} = ?`, [String(targetYear)])
       .where('expenses.status', 'approved')
       .select(
-        db.raw("strftime('%m', expenses.date) as month"),
+        db.raw(`${strftimeMonthNum('expenses.date')} as month`),
         db.raw('SUM(expenses.amount) as total_amount'),
         db.raw('COUNT(*) as expense_count')
       )
-      .groupBy(db.raw("strftime('%m', expenses.date)"))
+      .groupBy(db.raw(`${strftimeMonthNum('expenses.date')}`))
       .orderBy('month', 'asc');
 
     if (employee_id) query = query.where('expenses.created_by', employee_id);
 
     const monthly = await query;
 
-    // By category
     let catQuery = db('expenses')
       .leftJoin('expense_heads', 'expenses.head_id', 'expense_heads.id')
-      .whereRaw("strftime('%Y', expenses.date) = ?", [String(targetYear)])
+      .whereRaw(`${strftimeYear('expenses.date')} = ?`, [String(targetYear)])
       .where('expenses.status', 'approved')
       .select('expense_heads.name as head_name', db.raw('SUM(expenses.amount) as total_amount'))
       .groupBy('expense_heads.name')
@@ -231,7 +224,7 @@ router.get('/reports/monthly', authenticate, async (req, res) => {
   }
 });
 
-// GET /api/dashboard/reports/employee — employee comparison
+// GET /api/dashboard/reports/employee
 router.get('/reports/employee', authenticate, async (req, res) => {
   try {
     const { year } = req.query;
@@ -239,14 +232,14 @@ router.get('/reports/employee', authenticate, async (req, res) => {
 
     const breakdown = await db('expenses')
       .leftJoin('users', 'expenses.created_by', 'users.id')
-      .whereRaw("strftime('%Y', expenses.date) = ?", [String(targetYear)])
+      .whereRaw(`${strftimeYear('expenses.date')} = ?`, [String(targetYear)])
       .where('expenses.status', 'approved')
       .select(
         'users.name as employee_name',
         db.raw('SUM(expenses.amount) as total_amount'),
         db.raw('COUNT(*) as expense_count')
       )
-      .groupBy('expenses.created_by')
+      .groupBy('expenses.created_by', 'users.name')
       .orderBy('total_amount', 'desc');
 
     res.json({ year: Number(targetYear), employees: breakdown });
