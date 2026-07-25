@@ -2,10 +2,12 @@ exports.seed = async function (knex) {
   // Clear existing heads
   await knex('expense_heads').del();
 
-  // Reset sequence for SQLite
+  // Reset sequences
   const isSQLite = knex.client.config.client === 'better-sqlite3';
   if (isSQLite) {
     await knex.raw("DELETE FROM sqlite_sequence WHERE name='expense_heads'");
+  } else {
+    await knex.raw("ALTER SEQUENCE expense_heads_id_seq RESTART WITH 1");
   }
 
   // Insert major heads
@@ -23,6 +25,11 @@ exports.seed = async function (knex) {
   ];
 
   await knex('expense_heads').insert(majorHeads);
+
+  // Reset sequence again after explicit ID inserts so subheads get correct auto IDs
+  if (!isSQLite) {
+    await knex.raw("ALTER SEQUENCE expense_heads_id_seq RESTART WITH 11");
+  }
 
   // Insert subheads
   const subheads = [
