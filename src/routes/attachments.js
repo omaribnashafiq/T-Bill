@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const db = require('../db');
@@ -6,10 +6,11 @@ const { authenticate, authorize } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const { log } = require('../db/auditLog');
 const { enqueue } = require('../utils/compressionQueue');
+const { getAttachmentUrl, deleteFile, isCloudinaryConfigured } = require('../utils/cloudinary');
 
 const router = express.Router();
 
-const VALID_ENTITY_TYPES = ['expense', 'settlement'];
+const VALID_ENTITY_TYPES = ['expense', 'settlement', 'collection'];
 
 // GET /api/attachments — list attachments for any entity
 router.get('/', authenticate, async (req, res) => {
@@ -96,13 +97,7 @@ router.post('/', authenticate, upload.array('files', 5), async (req, res) => {
     }
 
     const attachments = req.files.map(f => {
-      // Build date-based URL from file path
-      const pathParts = f.path.split(require('path').sep);
-      const uploadsIdx = pathParts.indexOf('uploads');
-      const publicUrl = uploadsIdx >= 0
-        ? '/' + pathParts.slice(uploadsIdx).join('/')
-        : '/uploads/' + f.filename;
-
+      const publicUrl = getAttachmentUrl(f);
       return {
         entity_type,
         entity_id: Number(entity_id),
@@ -114,16 +109,18 @@ router.post('/', authenticate, upload.array('files', 5), async (req, res) => {
 
     const saved = await db('attachments').insert(attachments).returning('*');
 
-    // Enqueue background compression for each file
-    saved.forEach((att, idx) => {
-      enqueue({
-        filePath: req.files[idx].path,
-        mimeType: req.files[idx].mimetype,
-        entityType: entity_type,
-        entityId: Number(entity_id),
-        attachmentId: att.id,
+    // Skip compression for Cloudinary (it handles optimization)
+    if (!isCloudinaryConfigured()) {
+      saved.forEach((att, idx) => {
+        enqueue({
+          filePath: req.files[idx].path,
+          mimeType: req.files[idx].mimetype,
+          entityType: entity_type,
+          entityId: Number(entity_id),
+          attachmentId: att.id,
+        });
       });
-    });
+    }
 
     await log({
       action: 'upload',
@@ -149,11 +146,7 @@ router.delete('/:id', authenticate, authorize('admin'), async (req, res) => {
       return res.status(404).json({ error: 'Attachment not found.' });
     }
 
-    // Remove file from disk
-    const filePath = path.join(__dirname, '..', '..', attachment.file_url);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
+    deleteFile(attachment.file_url);
 
     await db('attachments').where({ id: req.params.id }).del();
 

@@ -4,6 +4,7 @@ const { authenticate, authorize } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const { log } = require('../db/auditLog');
 const { enqueue } = require('../utils/compressionQueue');
+const { getAttachmentUrl, isCloudinaryConfigured } = require('../utils/cloudinary');
 
 const router = express.Router();
 
@@ -44,12 +45,7 @@ router.post('/', authenticate, authorize('employee', 'admin'), upload.array('fil
     const savedAttachments = [];
     if (req.files && req.files.length > 0) {
       const attachments = req.files.map((f) => {
-        const pathParts = f.path.split(require('path').sep);
-        const uploadsIdx = pathParts.indexOf('uploads');
-        const publicUrl = uploadsIdx >= 0
-          ? '/' + pathParts.slice(uploadsIdx).join('/')
-          : '/uploads/' + f.filename;
-
+        const publicUrl = getAttachmentUrl(f);
         return {
           expense_id: expense.id,
           entity_type: 'expense',
@@ -62,16 +58,17 @@ router.post('/', authenticate, authorize('employee', 'admin'), upload.array('fil
       const inserted = await db('attachments').insert(attachments).returning('*');
       savedAttachments.push(...inserted);
 
-      // Enqueue background compression for each file
-      inserted.forEach((att, idx) => {
-        enqueue({
-          filePath: req.files[idx].path,
-          mimeType: req.files[idx].mimetype,
-          entityType: 'expense',
-          entityId: expense.id,
-          attachmentId: att.id,
+      if (!isCloudinaryConfigured()) {
+        inserted.forEach((att, idx) => {
+          enqueue({
+            filePath: req.files[idx].path,
+            mimeType: req.files[idx].mimetype,
+            entityType: 'expense',
+            entityId: expense.id,
+            attachmentId: att.id,
+          });
         });
-      });
+      }
     }
 
     // Fetch full expense with relations
