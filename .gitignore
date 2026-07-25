@@ -1,0 +1,9 @@
+node_modules/
+.env
+uploads/*
+!uploads/.gitkeep
+dev.sqlite3
+tunnel.txt
+tunnel_err.txt
+*.sqlite3-journal
+*.log

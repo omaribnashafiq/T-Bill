@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>T Bill - Expense Management</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    .page { display: none; }
+    .page.active { display: block; }
+    .sidebar-link.active { background: rgba(255,255,255,0.15); }
+    .fade-in { animation: fadeIn 0.2s ease-in; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .stat-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
+    .stat-card { transition: all 0.2s ease; }
+    .table-row:hover { background: #f8fafc; }
+    .modal-overlay { background: rgba(0,0,0,0.5); }
+    select, input, textarea { border-color: #e2e8f0; }
+    select:focus, input:focus, textarea:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+  <!-- LOGIN PAGE -->
+  <div id="login-page" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-600 to-blue-800">
+    <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+      <div class="text-center mb-8">
+        <h1 class="text-3xl font-bold text-gray-800">T Bill</h1>
+        <p class="text-gray-500 mt-2">Expense Management System</p>
+      </div>
+      <form id="login-form" class="space-y-5">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <input type="email" id="login-email" required class="w-full px-4 py-3 border rounded-lg focus:outline-none" placeholder="admin@tbill.com">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+          <input type="password" id="login-password" required class="w-full px-4 py-3 border rounded-lg focus:outline-none" placeholder="Enter password">
+        </div>
+        <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition">Sign In</button>
+        <p id="login-error" class="text-red-500 text-sm text-center hidden"></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- MAIN APP -->
+  <div id="app" class="hidden">
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="fixed left-0 top-0 h-full w-64 bg-gray-900 text-white z-40 transform transition-transform -translate-x-full lg:translate-x-0 flex flex-col">
+      <div class="p-6 border-b border-gray-700 shrink-0">
+        <h1 class="text-xl font-bold">T Bill</h1>
+        <p class="text-gray-400 text-sm mt-1" id="sidebar-role"></p>
+      </div>
+      <nav class="p-4 space-y-1 flex-1 overflow-y-auto" id="sidebar-nav"></nav>
+      <div class="p-4 border-t border-gray-700 shrink-0">
+        <div class="flex items-center gap-3 mb-3">
+          <div class="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center font-semibold text-sm" id="user-avatar"></div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium truncate" id="user-name"></p>
+            <p class="text-xs text-gray-400 truncate" id="user-email"></p>
+          </div>
+        </div>
+        <button onclick="logout()" class="w-full text-left text-sm text-gray-400 hover:text-white py-2"><i class="fas fa-sign-out-alt mr-2"></i>Sign Out</button>
+      </div>
+    </aside>
+
+    <!-- MOBILE HEADER -->
+    <div class="lg:hidden fixed top-0 left-0 right-0 bg-white shadow-sm z-30 p-4 flex items-center">
+      <button onclick="toggleSidebar()" class="text-gray-600 mr-3"><i class="fas fa-bars text-xl"></i></button>
+      <h1 class="font-bold text-gray-800">T Bill</h1>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <main class="lg:ml-64 pt-16 lg:pt-0 min-h-screen">
+      <div class="p-6 lg:p-8" id="content"></div>
+    </main>
+  </div>
+
+  <!-- MODAL -->
+  <div id="modal" class="fixed inset-0 modal-overlay z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between p-6 border-b">
+        <h3 id="modal-title" class="text-lg font-semibold"></h3>
+        <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button>
+      </div>
+      <div id="modal-body" class="p-6"></div>
+    </div>
+  </div>
+
+  <!-- VERSION HISTORY PANEL -->
+  <div id="version-history-overlay" class="fixed inset-0 bg-black/20 z-[55] hidden" onclick="closeVersionHistory()"></div>
+  <div id="version-history-panel" class="fixed top-0 right-0 h-full w-96 bg-white shadow-2xl z-[60] hidden transform translate-x-full transition-transform duration-300">
+    <div class="flex items-center justify-between p-5 border-b bg-gray-50">
+      <h3 class="text-lg font-semibold text-gray-800"><i class="fas fa-clock mr-2 text-blue-500"></i>Version History</h3>
+      <button onclick="closeVersionHistory()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button>
+    </div>
+    <div id="version-history-body" class="p-5 overflow-y-auto" style="height: calc(100% - 65px);"></div>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
