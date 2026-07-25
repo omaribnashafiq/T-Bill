@@ -1,7 +1,6 @@
 const bcrypt = require('bcryptjs');
 
 exports.seed = async function (knex) {
-  // Check if admin already exists
   const existing = await knex('users').where({ email: 'admin@tbill.com' }).first();
   if (existing) return;
 

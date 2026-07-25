@@ -51,7 +51,6 @@ exports.seed = async function (knex) {
     d.setDate(d.getDate() - i);
     const dateStr = d.toISOString().split('T')[0];
 
-    // Rahim's expenses
     if (i % 2 === 0) {
       expenses.push({ date: dateStr, head_id: transportation.id, subhead_id: productDelivery.id, amount: 800 + Math.floor(Math.random() * 700), explanation: 'Product delivery to Banani', status: i < 5 ? 'pending' : 'approved', created_by: rahim.id, approved_by: i < 5 ? null : nargis.id, approved_at: i < 5 ? null : new Date(d.getTime() + 86400000).toISOString() });
     }
@@ -59,7 +58,6 @@ exports.seed = async function (knex) {
       expenses.push({ date: dateStr, head_id: food.id, subhead_id: staffMeals.id, amount: 1200 + Math.floor(Math.random() * 800), explanation: 'Staff lunch - Gulshan office', status: i < 3 ? 'pending' : 'approved', created_by: rahim.id, approved_by: i < 3 ? null : nargis.id, approved_at: i < 3 ? null : new Date(d.getTime() + 86400000).toISOString() });
     }
 
-    // Karim's expenses
     if (i % 2 === 1) {
       expenses.push({ date: dateStr, head_id: transportation.id, subhead_id: productDelivery.id, amount: 600 + Math.floor(Math.random() * 500), explanation: 'Delivery to Dhanmondi', status: i < 7 ? 'pending' : 'approved', created_by: karim.id, approved_by: i < 7 ? null : nargis.id, approved_at: i < 7 ? null : new Date(d.getTime() + 86400000).toISOString() });
     }
@@ -67,7 +65,6 @@ exports.seed = async function (knex) {
       expenses.push({ date: dateStr, head_id: utilities.id, subhead_id: electricity.id, amount: 3500, explanation: 'Monthly electricity bill', status: i < 4 ? 'pending' : 'approved', created_by: karim.id, approved_by: i < 4 ? null : nargis.id, approved_at: i < 4 ? null : new Date(d.getTime() + 86400000).toISOString() });
     }
 
-    // Fatima's expenses
     if (i % 3 === 1) {
       expenses.push({ date: dateStr, head_id: supplies.id, amount: 500 + Math.floor(Math.random() * 1000), explanation: 'Printer paper and pens', status: i < 2 ? 'pending' : i < 6 ? 'rejected' : 'approved', created_by: fatima.id, approved_by: i < 2 ? null : nargis.id, approved_at: i < 2 ? null : new Date(d.getTime() + 86400000).toISOString() });
     }
@@ -75,12 +72,10 @@ exports.seed = async function (knex) {
       expenses.push({ date: dateStr, head_id: communication.id, amount: 300 + Math.floor(Math.random() * 200), explanation: 'Phone recharge', status: 'approved', created_by: fatima.id, approved_by: nargis.id, approved_at: new Date(d.getTime() + 86400000).toISOString() });
     }
 
-    // Rent (once a month)
     if (i === 15) {
       expenses.push({ date: dateStr, head_id: officeRent.id, amount: 25000, explanation: 'Monthly office rent - Uttara', status: 'approved', created_by: rahim.id, approved_by: nargis.id, approved_at: new Date(d.getTime() + 86400000).toISOString() });
     }
 
-    // Internet
     if (i === 10) {
       expenses.push({ date: dateStr, head_id: utilities.id, subhead_id: internet.id, amount: 1500, explanation: 'Monthly internet bill', status: 'approved', created_by: karim.id, approved_by: nargis.id, approved_at: new Date(d.getTime() + 86400000).toISOString() });
     }
@@ -88,7 +83,6 @@ exports.seed = async function (knex) {
 
   await knex('expenses').insert(expenses);
 
-  // Settlements (last 10 days)
   const settlements = [];
   for (let i = 0; i < 10; i++) {
     const d = new Date(today);
@@ -104,12 +98,10 @@ exports.seed = async function (knex) {
   }
   await knex('daily_settlements').insert(settlements);
 
-  // Petty cash fund
   const [fund] = await knex('petty_cash')
     .insert({ date: today.toISOString().split('T')[0], opening_balance: 10000, current_balance: 4500, created_by: 1 })
     .returning('*');
 
-  // Petty cash transactions
   await knex('petty_cash_transactions').insert([
     { petty_cash_id: fund.id, date: today.toISOString().split('T')[0], type: 'dispense', amount: 1500, explanation: 'Tea and snacks for meeting', head_id: misc.id, status: 'approved', created_by: rahim.id, approved_by: nargis.id, approved_at: new Date().toISOString() },
     { petty_cash_id: fund.id, date: today.toISOString().split('T')[0], type: 'dispense', amount: 2000, explanation: 'Courier charges', head_id: misc.id, status: 'approved', created_by: karim.id, approved_by: nargis.id, approved_at: new Date().toISOString() },
@@ -118,7 +110,6 @@ exports.seed = async function (knex) {
     { petty_cash_id: fund.id, date: new Date(today.getTime() - 86400000).toISOString().split('T')[0], type: 'replenish', amount: 5000, explanation: 'Fund replenishment', status: 'approved', created_by: 1, approved_by: 1, approved_at: new Date().toISOString() },
   ]);
 
-  // Budgets for current month
   const thisMonth = today.toISOString().slice(0, 7);
   await knex('budgets').insert([
     { year_month: thisMonth, head_id: transportation.id, amount: 25000, created_by: 1 },
@@ -130,7 +121,6 @@ exports.seed = async function (knex) {
     { year_month: thisMonth, head_id: misc.id, amount: 5000, created_by: 1 },
   ]);
 
-  // Audit log entries
   await knex('audit_log').insert([
     { action: 'create', entity: 'expense', entity_id: 1, details: JSON.stringify({ amount: 1200, head_id: transportation.id }), performed_by: rahim.id },
     { action: 'approve', entity: 'expense', entity_id: 1, details: JSON.stringify({ amount: 1200, created_by: rahim.id }), performed_by: nargis.id },
