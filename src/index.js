@@ -15,6 +15,7 @@ const exportRoutes = require('./routes/export');
 const auditLogRoutes = require('./routes/auditLog');
 const attachmentRoutes = require('./routes/attachments');
 const collectionRoutes = require('./routes/collections');
+const passwordResetRoutes = require('./routes/passwordReset');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -38,6 +39,7 @@ app.use('/api/export', exportRoutes);
 app.use('/api/audit-log', auditLogRoutes);
 app.use('/api/attachments', attachmentRoutes);
 app.use('/api/collections', collectionRoutes);
+app.use('/api/password-reset', passwordResetRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

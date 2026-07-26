@@ -105,6 +105,46 @@ function logout() {
   showLogin();
 }
 
+function showForgotPassword() {
+  openModal('Reset Password', `
+    <form id="forgot-form" class="space-y-4">
+      <p class="text-sm text-gray-500">Enter your email and we'll send a 6-digit reset code.</p>
+      <div><label class="block text-sm font-medium mb-1">Email</label><input type="email" id="fp-email" required class="w-full px-3 py-2 border rounded-lg" placeholder="you@tbill.com"></div>
+      <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700">Send Code</button>
+    </form>
+  `);
+  document.getElementById('forgot-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('fp-email').value;
+    try {
+      await api.post('/password-reset/request', { email });
+      toast('If the email exists, a reset code has been sent.');
+      showResetCodeForm(email);
+    } catch (err) { toast(err.message, 'error'); }
+  });
+}
+
+function showResetCodeForm(email) {
+  openModal('Enter Reset Code', `
+    <form id="reset-code-form" class="space-y-4">
+      <p class="text-sm text-gray-500">Enter the 6-digit code sent to <strong>${email}</strong></p>
+      <div><label class="block text-sm font-medium mb-1">Code</label><input type="text" id="fp-code" required maxlength="6" pattern="\\d{6}" class="w-full px-3 py-2 border rounded-lg text-center text-lg tracking-widest" placeholder="000000"></div>
+      <div><label class="block text-sm font-medium mb-1">New Password</label><input type="password" id="fp-new-pw" required minlength="6" class="w-full px-3 py-2 border rounded-lg" placeholder="Min 6 characters"></div>
+      <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700">Reset Password</button>
+    </form>
+  `);
+  document.getElementById('reset-code-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const code = document.getElementById('fp-code').value;
+    const newPassword = document.getElementById('fp-new-pw').value;
+    try {
+      await api.post('/password-reset/verify', { email, code, newPassword });
+      closeModal();
+      toast('Password updated! You can now log in.');
+    } catch (err) { toast(err.message, 'error'); }
+  });
+}
+
 function toast(msg, type = 'success') {
   const el = document.createElement('div');
   el.className = `fixed top-4 right-4 z-50 px-6 py-3 rounded-lg text-white font-medium shadow-lg fade-in ${type === 'error' ? 'bg-red-500' : 'bg-green-500'}`;
@@ -1357,7 +1397,7 @@ async function renderProfile() {
 
   document.getElementById('pw-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    try { await api.patch('/users/password/change', { current_password: document.getElementById('pw-current').value, new_password: document.getElementById('pw-new').value }); toast('Password changed'); document.getElementById('pw-current').value = ''; document.getElementById('pw-new').value = ''; } catch (err) { toast(err.message, 'error'); }
+    try { await api.post('/password-reset/change', { currentPassword: document.getElementById('pw-current').value, newPassword: document.getElementById('pw-new').value }); toast('Password changed'); document.getElementById('pw-current').value = ''; document.getElementById('pw-new').value = ''; } catch (err) { toast(err.message, 'error'); }
   });
 }
 
