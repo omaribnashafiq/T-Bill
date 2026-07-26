@@ -158,6 +158,26 @@ router.patch('/:id/toggle', authenticate, authorize('admin'), async (req, res) =
   }
 });
 
+// DELETE /api/users/:id — admin deletes user
+router.delete('/:id', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const user = await db('users').where({ id: req.params.id }).first();
+    if (!user) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    if (user.id === req.user.id) {
+      return res.status(400).json({ error: 'Cannot delete your own account.' });
+    }
+
+    await db('users').where({ id: req.params.id }).del();
+    res.json({ message: 'User deleted.' });
+  } catch (err) {
+    console.error('Delete user error:', err);
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+});
+
 // PATCH /api/users/profile — any user updates own profile
 router.patch('/profile/edit', authenticate, async (req, res) => {
   try {

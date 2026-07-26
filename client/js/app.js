@@ -1245,7 +1245,8 @@ async function renderUsers() {
         <td class="px-4 py-3 text-sm">
           <button onclick="showEditUser(${u.id})" class="text-blue-600 hover:text-blue-800 mr-2"><i class="fas fa-edit"></i></button>
           <button onclick="toggleUser(${u.id})" class="text-gray-500 hover:text-gray-700 mr-2"><i class="fas fa-toggle-${u.is_active ? 'on text-green-500' : 'off'}"></i></button>
-          <button onclick="showResetPassword(${u.id})" class="text-orange-500 hover:text-orange-700"><i class="fas fa-key"></i></button>
+          <button onclick="showResetPassword(${u.id})" class="text-orange-500 hover:text-orange-700 mr-2"><i class="fas fa-key"></i></button>
+          <button onclick="deleteUser(${u.id}, '${u.name}')" class="text-red-500 hover:text-red-700"><i class="fas fa-trash"></i></button>
         </td>
       </tr>`).join('')}</tbody></table>
     </div>
@@ -1307,6 +1308,11 @@ async function showResetPassword(id) {
     e.preventDefault();
     try { await api.patch(`/users/${id}/reset-password`, { new_password: document.getElementById('rp-pass').value }); closeModal(); toast('Password reset'); } catch (err) { toast(err.message, 'error'); }
   });
+}
+
+async function deleteUser(id, name) {
+  if (!confirm(`Delete user "${name}"? This cannot be undone.`)) return;
+  try { await api.delete(`/users/${id}`); toast('User deleted'); renderPage('users'); } catch (err) { toast(err.message, 'error'); }
 }
 
 // ==================== REPORTS ====================
