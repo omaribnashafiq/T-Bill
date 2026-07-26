@@ -180,7 +180,7 @@ router.get('/summary', authenticate, authorize('admin', 'accounts_head'), async 
     const spending = await db('expenses')
       .leftJoin('expense_heads', 'expenses.head_id', 'expense_heads.id')
       .where('expenses.status', 'approved')
-      .whereRaw("strftime('%Y-%m', expenses.date) = ?", [currentMonth])
+      .whereRaw(`${strftimeMonth('expenses.date')} = ?`, [currentMonth])
       .select('expenses.head_id', 'expense_heads.name as head_name', db.raw('SUM(expenses.amount) as spent'))
       .groupBy('expenses.head_id');
 
