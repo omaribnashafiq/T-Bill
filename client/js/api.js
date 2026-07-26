@@ -29,13 +29,15 @@ const api = {
     if (body) opts.body = isFormData ? body : JSON.stringify(body);
 
     const res = await fetch(`${API_BASE}${path}`, opts);
-    if (res.status === 401) {
-      this.clearAuth();
-      showLogin();
-      throw new Error('Session expired');
-    }
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Request failed');
+    if (!res.ok) {
+      if (res.status === 401 && this.token) {
+        this.clearAuth();
+        showLogin();
+        throw new Error('Session expired');
+      }
+      throw new Error(data.error || 'Request failed');
+    }
     return data;
   },
 

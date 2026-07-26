@@ -101,5 +101,57 @@
 
   <script src="js/api.js"></script>
   <script src="js/app.js"></script>
+  <script>
+    // Forgot password functions (needed on login page before app.js context)
+    if (typeof showForgotPassword === 'undefined') {
+      window.showForgotPassword = function() {
+        const body = document.getElementById('modal-body');
+        body.innerHTML = `
+          <form id="forgot-form" class="space-y-4">
+            <p class="text-sm text-gray-500">Enter your email and we'll send a 6-digit reset code.</p>
+            <div><label class="block text-sm font-medium mb-1">Email</label><input type="email" id="fp-email" required class="w-full px-3 py-2 border rounded-lg" placeholder="you@tbill.com"></div>
+            <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700">Send Code</button>
+          </form>
+        `;
+        document.getElementById('modal-title').textContent = 'Reset Password';
+        document.getElementById('modal').classList.remove('hidden');
+        document.getElementById('forgot-form').addEventListener('submit', async function(e) {
+          e.preventDefault();
+          const email = document.getElementById('fp-email').value;
+          try {
+            await api.post('/password-reset/request', { email });
+            showResetCodeForm(email);
+          } catch (err) { alert(err.message); }
+        });
+      };
+
+      window.showResetCodeForm = function(email) {
+        const body = document.getElementById('modal-body');
+        body.innerHTML = `
+          <form id="reset-code-form" class="space-y-4">
+            <p class="text-sm text-gray-500">Enter the 6-digit code sent to <strong>${email}</strong></p>
+            <div><label class="block text-sm font-medium mb-1">Code</label><input type="text" id="fp-code" required maxlength="6" pattern="\\d{6}" class="w-full px-3 py-2 border rounded-lg text-center text-lg tracking-widest" placeholder="000000"></div>
+            <div><label class="block text-sm font-medium mb-1">New Password</label><input type="password" id="fp-new-pw" required minlength="6" class="w-full px-3 py-2 border rounded-lg" placeholder="Min 6 characters"></div>
+            <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700">Reset Password</button>
+          </form>
+        `;
+        document.getElementById('modal-title').textContent = 'Enter Reset Code';
+        document.getElementById('reset-code-form').addEventListener('submit', async function(e) {
+          e.preventDefault();
+          const code = document.getElementById('fp-code').value;
+          const newPassword = document.getElementById('fp-new-pw').value;
+          try {
+            await api.post('/password-reset/verify', { email, code, newPassword });
+            document.getElementById('modal').classList.add('hidden');
+            alert('Password updated! You can now log in.');
+          } catch (err) { alert(err.message); }
+        });
+      };
+
+      window.closeModal = function() {
+        document.getElementById('modal').classList.add('hidden');
+      };
+    }
+  </script>
 </body>
 </html>
