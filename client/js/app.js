@@ -1053,21 +1053,23 @@ async function renderBudgets() {
   const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   const [budgetData, headsData] = await Promise.all([api.get(`/budgets?year_month=${ym}`), api.get('/expense-heads/flat')]);
 
+  const canEdit = api.user.role === 'admin' || api.user.role === 'accounts_head';
   let html = `<div class="fade-in">
     <div class="flex items-center justify-between mb-6">
       <h2 class="text-2xl font-bold text-gray-800">Budgets - ${ym}</h2>
-      ${api.user.role === 'admin' ? `<button onclick="showBudgetForm('${ym}')" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700"><i class="fas fa-plus mr-1"></i>Set Budgets</button>` : ''}
+      ${canEdit ? `<button onclick="showBudgetForm('${ym}')" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700"><i class="fas fa-plus mr-1"></i>Set Budgets</button>` : ''}
     </div>
     <div class="bg-white rounded-xl shadow-sm overflow-hidden">
       <table class="w-full"><thead><tr class="text-left text-xs text-gray-500 bg-gray-50">
-        <th class="px-4 py-3">Category</th><th class="px-4 py-3">Budget</th><th class="px-4 py-3">Spent</th><th class="px-4 py-3">Remaining</th><th class="px-4 py-3">Utilization</th>
+        <th class="px-4 py-3">Category</th><th class="px-4 py-3">Budget</th><th class="px-4 py-3">Spent</th><th class="px-4 py-3">Remaining</th><th class="px-4 py-3">Utilization</th>${canEdit ? '<th class="px-4 py-3">Actions</th>' : ''}
       </tr></thead><tbody>${budgetData.budgets.map(b => `<tr class="table-row border-b">
         <td class="px-4 py-3 text-sm font-medium">${b.head_name}</td>
         <td class="px-4 py-3 text-sm">${fmt(b.amount)}</td>
         <td class="px-4 py-3 text-sm">${fmt(b.spent)}</td>
         <td class="px-4 py-3 text-sm ${b.remaining < 0 ? 'text-red-600 font-medium' : ''}">${fmt(b.remaining)}</td>
         <td class="px-4 py-3"><div class="flex items-center gap-2"><div class="flex-1 h-2 bg-gray-100 rounded-full"><div class="h-2 rounded-full ${b.utilization_pct > 100 ? 'bg-red-500' : b.utilization_pct > 80 ? 'bg-yellow-500' : 'bg-green-500'}" style="width:${Math.min(b.utilization_pct, 100)}%"></div></div><span class="text-xs text-gray-500 w-12">${b.utilization_pct}%</span></div></td>
-      </tr>`).join('') || '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-400">No budgets set for this month</td></tr>'}</tbody></table>
+        ${canEdit ? `<td class="px-4 py-3"><button onclick="showEditBudget(${b.id}, '${b.head_name}', ${b.amount}, '${b.year_month}')" class="text-orange-500 hover:text-orange-700 mr-2" title="Edit"><i class="fas fa-pencil-alt"></i></button>${api.user.role === 'admin' ? `<button onclick="deleteBudget(${b.id})" class="text-red-500 hover:text-red-700" title="Delete"><i class="fas fa-trash"></i></button>` : ''}</td>` : ''}
+      </tr>`).join('') || '<tr><td colspan="' + (canEdit ? 6 : 5) + '" class="px-4 py-8 text-center text-gray-400">No budgets set for this month</td></tr>'}</tbody></table>
     </div>
   </div>`;
   content.innerHTML = html;
@@ -1097,6 +1099,27 @@ async function showBudgetForm(ym) {
     if (budgets.length === 0) { toast('Enter at least one budget', 'error'); return; }
     try { await api.post('/budgets/bulk', { year_month: month, budgets }); closeModal(); toast('Budgets saved'); renderPage('budgets'); } catch (err) { toast(err.message, 'error'); }
   });
+}
+
+function showEditBudget(id, headName, amount, yearMonth) {
+  openModal(`Edit Budget — ${headName}`, `
+    <form id="edit-budget-form" class="space-y-4">
+      <div><label class="block text-sm font-medium mb-1">Month</label><input type="text" value="${yearMonth}" class="w-full px-3 py-2 border rounded-lg bg-gray-100" disabled></div>
+      <div><label class="block text-sm font-medium mb-1">Amount (৳)</label><input type="number" step="0.01" id="eb-amount" value="${amount}" class="w-full px-3 py-2 border rounded-lg" required></div>
+      <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700">Update Budget</button>
+    </form>
+  `);
+  document.getElementById('edit-budget-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const newAmount = parseFloat(document.getElementById('eb-amount').value);
+    if (!newAmount || newAmount < 0) { toast('Enter a valid amount', 'error'); return; }
+    try { await api.patch(`/budgets/${id}`, { amount: newAmount }); closeModal(); toast('Budget updated'); renderPage('budgets'); } catch (err) { toast(err.message, 'error'); }
+  });
+}
+
+async function deleteBudget(id) {
+  if (!confirm('Delete this budget?')) return;
+  try { await api.delete(`/budgets/${id}`); toast('Budget deleted'); renderPage('budgets'); } catch (err) { toast(err.message, 'error'); }
 }
 
 // ==================== EXPENSE HEADS ====================

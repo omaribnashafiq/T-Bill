@@ -42,6 +42,7 @@ const api = {
   get(path) { return this.request('GET', path); },
   post(path, body, isFormData) { return this.request('POST', path, body, isFormData); },
   patch(path, body, isFormData) { return this.request('PATCH', path, body, isFormData); },
+  delete(path) { return this.request('DELETE', path); },
 
   download(path, filename) {
     const a = document.createElement('a');

@@ -50,8 +50,8 @@ router.get('/', authenticate, authorize('admin', 'accounts_head'), async (req, r
   }
 });
 
-// POST /api/budgets — admin sets budget
-router.post('/', authenticate, authorize('admin'), async (req, res) => {
+// POST /api/budgets — admin/accounts_head sets budget
+router.post('/', authenticate, authorize('admin', 'accounts_head'), async (req, res) => {
   try {
     const { year_month, head_id, amount } = req.body;
 
@@ -91,8 +91,8 @@ router.post('/', authenticate, authorize('admin'), async (req, res) => {
   }
 });
 
-// POST /api/budgets/bulk — admin sets multiple budgets at once
-router.post('/bulk', authenticate, authorize('admin'), async (req, res) => {
+// POST /api/budgets/bulk — admin/accounts_head sets multiple budgets at once
+router.post('/bulk', authenticate, authorize('admin', 'accounts_head'), async (req, res) => {
   try {
     const { year_month, budgets } = req.body;
 
@@ -121,6 +121,47 @@ router.post('/bulk', authenticate, authorize('admin'), async (req, res) => {
     res.status(201).json({ budgets: results });
   } catch (err) {
     console.error('Bulk set budgets error:', err);
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+});
+
+// PATCH /api/budgets/:id — admin/accounts_head edits budget
+router.patch('/:id', authenticate, authorize('admin', 'accounts_head'), async (req, res) => {
+  try {
+    const { amount } = req.body;
+    if (amount == null || amount < 0) {
+      return res.status(400).json({ error: 'A valid amount is required.' });
+    }
+
+    const budget = await db('budgets').where({ id: req.params.id }).first();
+    if (!budget) {
+      return res.status(404).json({ error: 'Budget not found.' });
+    }
+
+    const [updated] = await db('budgets')
+      .where({ id: req.params.id })
+      .update({ amount })
+      .returning('*');
+
+    res.json({ budget: updated });
+  } catch (err) {
+    console.error('Edit budget error:', err);
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+});
+
+// DELETE /api/budgets/:id — admin deletes budget
+router.delete('/:id', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const budget = await db('budgets').where({ id: req.params.id }).first();
+    if (!budget) {
+      return res.status(404).json({ error: 'Budget not found.' });
+    }
+
+    await db('budgets').where({ id: req.params.id }).del();
+    res.json({ message: 'Budget deleted.' });
+  } catch (err) {
+    console.error('Delete budget error:', err);
     res.status(500).json({ error: 'Internal server error.' });
   }
 });
