@@ -158,7 +158,7 @@ router.patch('/:id/toggle', authenticate, authorize('admin'), async (req, res) =
   }
 });
 
-// DELETE /api/users/:id — admin deletes user
+// DELETE /api/users/:id — admin deactivates user (can't hard-delete due to foreign keys)
 router.delete('/:id', authenticate, authorize('admin'), async (req, res) => {
   try {
     const user = await db('users').where({ id: req.params.id }).first();
@@ -170,8 +170,12 @@ router.delete('/:id', authenticate, authorize('admin'), async (req, res) => {
       return res.status(400).json({ error: 'Cannot delete your own account.' });
     }
 
-    await db('users').where({ id: req.params.id }).del();
-    res.json({ message: 'User deleted.' });
+    if (!user.is_active) {
+      return res.status(400).json({ error: 'User is already deactivated.' });
+    }
+
+    await db('users').where({ id: req.params.id }).update({ is_active: false });
+    res.json({ message: 'User deactivated.' });
   } catch (err) {
     console.error('Delete user error:', err);
     res.status(500).json({ error: 'Internal server error.' });

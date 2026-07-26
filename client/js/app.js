@@ -1311,8 +1311,8 @@ async function showResetPassword(id) {
 }
 
 async function deleteUser(id, name) {
-  if (!confirm(`Delete user "${name}"? This cannot be undone.`)) return;
-  try { await api.delete(`/users/${id}`); toast('User deleted'); renderPage('users'); } catch (err) { toast(err.message, 'error'); }
+  if (!confirm(`Deactivate user "${name}"? They won't be able to log in.`)) return;
+  try { await api.delete(`/users/${id}`); toast('User deactivated'); renderPage('users'); } catch (err) { toast(err.message, 'error'); }
 }
 
 // ==================== REPORTS ====================
