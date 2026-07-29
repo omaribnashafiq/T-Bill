@@ -11,6 +11,21 @@ const router = express.Router();
 
 const VALID_ENTITY_TYPES = ['expense', 'settlement'];
 
+// Employees may only see attachments on their own expenses/settlements — this
+// returns the owning user id for a given entity so callers can check it against
+// req.user.id, rather than trusting entity_type/entity_id from the query string.
+async function getOwnerId(entity_type, entity_id) {
+  if (entity_type === 'expense') {
+    const row = await db('expenses').where({ id: entity_id }).first();
+    return row ? row.created_by : null;
+  }
+  if (entity_type === 'settlement') {
+    const row = await db('daily_settlements').where({ id: entity_id }).first();
+    return row ? row.employee_id : null;
+  }
+  return null;
+}
+
 // GET /api/attachments — list attachments for any entity
 router.get('/', authenticate, async (req, res) => {
   try {
@@ -22,6 +37,13 @@ router.get('/', authenticate, async (req, res) => {
 
     if (!VALID_ENTITY_TYPES.includes(entity_type)) {
       return res.status(400).json({ error: 'Invalid entity_type.' });
+    }
+
+    if (req.user.role === 'employee') {
+      const ownerId = await getOwnerId(entity_type, entity_id);
+      if (ownerId !== req.user.id) {
+        return res.status(403).json({ error: 'Access denied.' });
+      }
     }
 
     const attachments = await db('attachments')
@@ -46,8 +68,17 @@ router.get('/count', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'entity_type and entity_ids are required.' });
     }
 
-    const ids = entity_ids.split(',').map(Number).filter(Boolean);
+    let ids = entity_ids.split(',').map(Number).filter(Boolean);
     if (ids.length === 0) return res.json({ counts: {} });
+
+    if (req.user.role === 'employee') {
+      const table = entity_type === 'expense' ? 'expenses' : entity_type === 'settlement' ? 'daily_settlements' : null;
+      const ownerCol = entity_type === 'expense' ? 'created_by' : 'employee_id';
+      if (!table) return res.json({ counts: {} });
+      const owned = await db(table).whereIn('id', ids).where(ownerCol, req.user.id).select('id');
+      ids = owned.map((o) => o.id);
+      if (ids.length === 0) return res.json({ counts: {} });
+    }
 
     const counts = await db('attachments')
       .where('entity_type', entity_type)

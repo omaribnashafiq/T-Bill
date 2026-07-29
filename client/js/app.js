@@ -139,6 +139,15 @@ function openLightbox(url) {
   document.addEventListener('keydown', escHandler);
 }
 
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 function fmt(n) { return '৳' + Number(n || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 }); }
 function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'; }
 function todayStr() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
@@ -466,7 +475,7 @@ function expenseRow(e, isEmployee) {
     ${showCheckbox ? `<td class="px-4 py-3 w-10"><input type="checkbox" class="expense-checkbox rounded" data-id="${e.id}" data-status="${e.status}" onchange="updateSelectedCount()"></td>` : (!isEmployee ? '<td class="px-4 py-3 w-10"></td>' : '')}
     <td class="px-4 py-3 text-sm">${fmtDate(e.date)}</td>
     <td class="px-4 py-3 text-sm">${e.head_name}${e.subhead_name ? ' / ' + e.subhead_name : ''}</td>
-    <td class="px-4 py-3 text-sm text-gray-600 max-w-[200px] truncate" title="${e.explanation || ''}">${e.explanation || '-'}</td>
+    <td class="px-4 py-3 text-sm text-gray-600 max-w-[200px] truncate" title="${escapeHtml(e.explanation || '')}">${escapeHtml(e.explanation) || '-'}</td>
     ${!isEmployee ? `<td class="px-4 py-3 text-sm">${e.created_by_name}</td>` : ''}
     <td class="px-4 py-3 text-sm font-medium">${fmt(e.amount)}</td>
     <td class="px-4 py-3">${statusBadge(e.status)}</td>
@@ -550,7 +559,7 @@ async function viewExpense(id) {
         <div><span class="text-gray-500">Amount</span><p class="font-bold text-lg">${fmt(e.amount)}</p></div>
         <div><span class="text-gray-500">Created by</span><p class="font-medium">${e.created_by_name}</p></div>
       </div>
-      ${e.explanation ? `<div><span class="text-gray-500 text-sm">Explanation</span><p class="mt-1 text-sm bg-gray-50 p-3 rounded-lg">${e.explanation}</p></div>` : ''}
+      ${e.explanation ? `<div><span class="text-gray-500 text-sm">Explanation</span><p class="mt-1 text-sm bg-gray-50 p-3 rounded-lg">${escapeHtml(e.explanation)}</p></div>` : ''}
       ${e.attachments.length ? `<div><span class="text-gray-500 text-sm">Attachments</span><div class="grid grid-cols-2 gap-3 mt-2">${e.attachments.map(a => {
         const isImage = a.file_type && a.file_type.startsWith('image/');
         if (isImage) {
@@ -560,7 +569,7 @@ async function viewExpense(id) {
           return `<a href="${a.file_url}" target="_blank" class="flex items-center gap-2 border rounded-lg p-3 hover:bg-gray-50" style="width:192px;height:192px;"><i class="fas ${isPdf ? 'fa-file-pdf text-red-500' : 'fa-file text-gray-400'} text-3xl"></i><span class="text-sm text-blue-600 hover:underline truncate">${a.file_url.split('/').pop()}</span></a>`;
         }
       }).join('')}</div></div>` : ''}
-      ${e.notes.length ? `<div><span class="text-gray-500 text-sm">Verification Notes</span><div class="space-y-2 mt-2">${e.notes.map(n => `<div class="bg-yellow-50 p-3 rounded-lg text-sm"><p>${n.note}</p><p class="text-xs text-gray-500 mt-1">${n.created_by_name} · ${fmtDate(n.created_at)}</p></div>`).join('')}</div></div>` : ''}
+      ${e.notes.length ? `<div><span class="text-gray-500 text-sm">Verification Notes</span><div class="space-y-2 mt-2">${e.notes.map(n => `<div class="bg-yellow-50 p-3 rounded-lg text-sm"><p>${escapeHtml(n.note)}</p><p class="text-xs text-gray-500 mt-1">${escapeHtml(n.created_by_name)} · ${fmtDate(n.created_at)}</p></div>`).join('')}</div></div>` : ''}
     </div>
   `);
 }
@@ -583,7 +592,7 @@ async function showEditExpense(id) {
         <select id="eef-subhead" class="w-full px-3 py-2 border rounded-lg"><option value="">None</option></select>
       </div>
       <div><label class="block text-sm font-medium mb-1">Amount (৳) *</label><input type="number" id="eef-amount" required step="0.01" min="0" value="${e.amount}" class="w-full px-3 py-2 border rounded-lg"></div>
-      <div><label class="block text-sm font-medium mb-1">Explanation</label><textarea id="eef-explanation" rows="3" class="w-full px-3 py-2 border rounded-lg">${e.explanation || ''}</textarea></div>
+      <div><label class="block text-sm font-medium mb-1">Explanation</label><textarea id="eef-explanation" rows="3" class="w-full px-3 py-2 border rounded-lg">${escapeHtml(e.explanation || '')}</textarea></div>
       <div><label class="block text-sm font-medium mb-1">Status</label>
         <select id="eef-status" class="w-full px-3 py-2 border rounded-lg">
           <option value="pending" ${e.status === 'pending' ? 'selected' : ''}>Pending</option>
@@ -797,7 +806,7 @@ async function viewCollection(id) {
         <div><span class="text-gray-500">Total</span><p class="font-bold text-lg">${fmt(c.total)}</p></div>
         <div><span class="text-gray-500">Created by</span><p class="font-medium">${c.created_by_name || '-'}</p></div>
       </div>
-      ${c.explanation ? `<div><span class="text-gray-500 text-sm">Explanation</span><p class="mt-1 text-sm bg-gray-50 p-3 rounded-lg">${c.explanation}</p></div>` : ''}
+      ${c.explanation ? `<div><span class="text-gray-500 text-sm">Explanation</span><p class="mt-1 text-sm bg-gray-50 p-3 rounded-lg">${escapeHtml(c.explanation)}</p></div>` : ''}
     </div>
   `);
 }
@@ -1038,7 +1047,7 @@ async function viewPettyCashFund(id) {
       <div><span class="text-gray-500 text-sm">Transactions</span>
         ${f.transactions.length ? `<div class="mt-2 space-y-2">${f.transactions.map(t => `
           <div class="flex items-center justify-between bg-gray-50 p-3 rounded-lg text-sm">
-            <div><span class="font-medium">${t.type === 'dispense' ? '-' : '+'} ${fmt(t.amount)}</span><p class="text-xs text-gray-500">${t.explanation || '-'} · ${fmtDate(t.date)}</p></div>
+            <div><span class="font-medium">${t.type === 'dispense' ? '-' : '+'} ${fmt(t.amount)}</span><p class="text-xs text-gray-500">${escapeHtml(t.explanation) || '-'} · ${fmtDate(t.date)}</p></div>
             <div>${statusBadge(t.status)}</div>
           </div>`).join('')}</div>` : '<p class="text-gray-400 text-sm mt-2">No transactions</p>'}
       </div>

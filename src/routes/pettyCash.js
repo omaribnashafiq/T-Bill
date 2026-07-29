@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const db = require('../db');
 const { authenticate, authorize } = require('../middleware/auth');
 const upload = require('../middleware/upload');
@@ -127,8 +128,16 @@ router.post('/:id/transactions', authenticate, authorize('employee', 'admin'), u
       return res.status(400).json({ error: 'Amount must be positive.' });
     }
 
-    if (Number(amount) > Number(fund.current_balance)) {
-      return res.status(400).json({ error: 'Insufficient petty cash balance.' });
+    // Reserve against pending dispenses too, not just current_balance — otherwise
+    // multiple pending requests can each pass this check against the same
+    // balance and later all get approved, overdrawing the fund.
+    const [{ pending_total }] = await db('petty_cash_transactions')
+      .where({ petty_cash_id: fund.id, type: 'dispense', status: 'pending' })
+      .select(db.raw('COALESCE(SUM(amount), 0) as pending_total'));
+    const available = Number(fund.current_balance) - Number(pending_total);
+
+    if (Number(amount) > available) {
+      return res.status(400).json({ error: 'Insufficient petty cash balance (including pending requests).' });
     }
 
     if (head_id) {
@@ -138,7 +147,14 @@ router.post('/:id/transactions', authenticate, authorize('employee', 'admin'), u
       }
     }
 
-    const receipt_url = req.file ? `/uploads/${req.file.filename}` : null;
+    let receipt_url = null;
+    if (req.file) {
+      const pathParts = req.file.path.split(path.sep);
+      const uploadsIdx = pathParts.indexOf('uploads');
+      receipt_url = uploadsIdx >= 0
+        ? '/' + pathParts.slice(uploadsIdx).join('/')
+        : `/uploads/${req.file.filename}`;
+    }
 
     const [transaction] = await db('petty_cash_transactions')
       .insert({

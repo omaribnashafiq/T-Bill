@@ -1,7 +1,9 @@
 const express = require('express');
+const path = require('path');
 const db = require('../db');
 const { authenticate, authorize } = require('../middleware/auth');
 const upload = require('../middleware/upload');
+const { log } = require('../db/auditLog');
 
 const router = express.Router();
 
@@ -22,7 +24,14 @@ router.post('/', authenticate, authorize('employee', 'admin'), upload.single('ba
       return res.status(409).json({ error: 'A settlement for this date already exists.' });
     }
 
-    const bank_screenshot_url = req.file ? `/uploads/${req.file.filename}` : null;
+    let bank_screenshot_url = null;
+    if (req.file) {
+      const pathParts = req.file.path.split(path.sep);
+      const uploadsIdx = pathParts.indexOf('uploads');
+      bank_screenshot_url = uploadsIdx >= 0
+        ? '/' + pathParts.slice(uploadsIdx).join('/')
+        : `/uploads/${req.file.filename}`;
+    }
 
     const [settlement] = await db('daily_settlements')
       .insert({

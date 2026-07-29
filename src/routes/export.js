@@ -4,6 +4,19 @@ const { authenticate, authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
+// Guards against CSV/formula injection: if a cell value starts with a
+// character a spreadsheet app would interpret as the start of a formula
+// (=, +, -, @, tab, CR), prefix it with a single-quote so it's treated as
+// literal text instead of executed. Applies to any free-text field a user
+// controls (explanation, notes, names) before it lands in an exported CSV.
+function csvSafe(value) {
+  const str = value === null || value === undefined ? '' : String(value);
+  if (/^[=+\-@\t\r]/.test(str)) {
+    return `'${str}`;
+  }
+  return str;
+}
+
 // GET /api/export/expenses — export expenses as CSV
 router.get('/expenses', authenticate, authorize('admin', 'accounts_head'), async (req, res) => {
   try {
@@ -39,13 +52,13 @@ router.get('/expenses', authenticate, authorize('admin', 'accounts_head'), async
     const headers = ['Date', 'Employee', 'Category', 'Subcategory', 'Amount (৳)', 'Explanation', 'Status', 'Approved By', 'Approved At', 'Created At'];
     const rows = expenses.map((e) => [
       e.date,
-      e.employee,
-      e.category,
-      e.subcategory || '',
+      csvSafe(e.employee),
+      csvSafe(e.category),
+      csvSafe(e.subcategory || ''),
       Number(e.amount).toFixed(2),
-      `"${(e.explanation || '').replace(/"/g, '""')}"`,
+      `"${csvSafe(e.explanation || '').replace(/"/g, '""')}"`,
       e.status,
-      e.approved_by || '',
+      csvSafe(e.approved_by || ''),
       e.approved_at || '',
       e.created_at,
     ]);
@@ -90,12 +103,12 @@ router.get('/settlements', authenticate, authorize('admin', 'accounts_head'), as
     const headers = ['Date', 'Employee', 'Total Expenses (৳)', 'Unspent (৳)', 'Bank Deposit (৳)', 'Status', 'Approved By', 'Approved At'];
     const rows = settlements.map((s) => [
       s.date,
-      s.employee,
+      csvSafe(s.employee),
       Number(s.total_expenses).toFixed(2),
       Number(s.total_unspent).toFixed(2),
       Number(s.bank_deposit_amount).toFixed(2),
       s.status,
-      s.approved_by || '',
+      csvSafe(s.approved_by || ''),
       s.approved_at || '',
     ]);
 
@@ -141,11 +154,11 @@ router.get('/petty-cash', authenticate, authorize('admin', 'accounts_head'), asy
       t.date,
       t.type,
       Number(t.amount).toFixed(2),
-      `"${(t.explanation || '').replace(/"/g, '""')}"`,
-      t.category || '',
-      t.dispensed_by,
+      `"${csvSafe(t.explanation || '').replace(/"/g, '""')}"`,
+      csvSafe(t.category || ''),
+      csvSafe(t.dispensed_by),
       t.status,
-      t.approved_by || '',
+      csvSafe(t.approved_by || ''),
     ]);
 
     const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
@@ -186,8 +199,8 @@ router.get('/monthly-summary', authenticate, authorize('admin'), async (req, res
 
     const headers = ['Employee', 'Category', 'Month', 'Total Amount (৳)', 'Expense Count'];
     const rows = data.map((d) => [
-      d.employee,
-      d.category,
+      csvSafe(d.employee),
+      csvSafe(d.category),
       d.month,
       Number(d.total_amount).toFixed(2),
       d.expense_count,

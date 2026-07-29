@@ -20,9 +20,28 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
+const allowedOrigins = (process.env.CORS_ORIGIN || '').split(',').map(o => o.trim()).filter(Boolean);
+app.use(cors(allowedOrigins.length ? { origin: allowedOrigins } : {}));
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+
+// Basic security headers (CSP mitigates stored-XSS blast radius; uploads served as attachments, not inline)
+app.use((req, res, next) => {
+  res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data:; font-src 'self' https://cdnjs.cloudflare.com; object-src 'none'; base-uri 'self'"
+  );
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  next();
+});
+
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads'), {
+  setHeaders: (res) => {
+    // Force download instead of inline rendering — prevents an uploaded HTML/SVG
+    // file from executing script in the app's origin even if it slipped past the filter.
+    res.setHeader('Content-Disposition', 'attachment');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+  },
+}));
 app.use(express.static(path.join(__dirname, '..', 'client')));
 
 // Routes
