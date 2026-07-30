@@ -196,87 +196,87 @@ async function renderDashboard() {
 
   if (api.user.role === 'admin') {
     const overBudget = (d.budget_alerts || []).filter(b => b.utilization_pct >= 100);
-    html += `<h2 class="text-2xl font-bold text-gray-800 mb-6">Admin Dashboard</h2>`;
+    html += `<h2 class="text-xl font-semibold text-gray-900 tracking-tight mb-6">Dashboard</h2>`;
 
     if (overBudget.length) {
-      html += `<div class="flex items-center gap-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-6">
-        <i class="fas fa-triangle-exclamation text-red-500"></i>
-        <span class="text-sm text-red-700 font-medium">${overBudget.length} expense head${overBudget.length > 1 ? 's are' : ' is'} over budget this month: ${overBudget.map(b => escapeHtml(b.head_name)).join(', ')}</span>
-        <button onclick="navigateTo('budgets')" class="ml-auto text-sm text-red-700 underline">View budgets</button>
+      html += `<div class="flex items-center gap-3 bg-red-50 border-l-2 border-red-400 rounded-r-md px-4 py-3 mb-6">
+        <i class="fas fa-triangle-exclamation text-red-400 text-sm"></i>
+        <span class="text-sm text-red-700">${overBudget.length} expense head${overBudget.length > 1 ? 's are' : ' is'} over budget this month: ${overBudget.map(b => escapeHtml(b.head_name)).join(', ')}</span>
+        <button onclick="navigateTo('budgets')" class="ml-auto text-sm text-red-700 hover:text-red-800">View budgets</button>
       </div>`;
     }
 
-    html += `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-      ${statCard('Total Expenses', fmt(d.expenses.total_amount), 'fa-receipt', 'blue', () => navigateTo('expenses'))}
-      ${statCard('Pending Approval', `${d.expenses.pending_count} (${fmt(d.expenses.pending_amount)})`, 'fa-clock', 'yellow', () => navigateToFiltered('expenses', 'pending'))}
-      ${statCard('Approved Total', fmt(d.expenses.approved_amount), 'fa-check-circle', 'green', () => navigateToFiltered('expenses', 'approved'))}
-      ${statCard('Active Users', d.users.active + ' / ' + d.users.total, 'fa-users', 'purple', () => navigateTo('users'))}
+    html += `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+      ${statCard('Total expenses', fmt(d.expenses.total_amount), 'fa-receipt', 'blue', () => navigateTo('expenses'))}
+      ${statCard('Pending approval', `${d.expenses.pending_count} (${fmt(d.expenses.pending_amount)})`, 'fa-clock', 'yellow', () => navigateToFiltered('expenses', 'pending'))}
+      ${statCard('Approved total', fmt(d.expenses.approved_amount), 'fa-check-circle', 'green', () => navigateToFiltered('expenses', 'approved'))}
+      ${statCard('Active users', d.users.active + ' / ' + d.users.total, 'fa-users', 'purple', () => navigateTo('users'))}
     </div>
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-      <div class="bg-white rounded-xl shadow-sm p-6">
-        <h3 class="font-semibold text-gray-800 mb-4">Needs attention</h3>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+      <div class="bg-white border border-gray-100 rounded-lg p-6">
+        <h3 class="text-sm font-medium text-gray-500 mb-4">Needs attention</h3>
         ${pendingQueueList(d.pending_queue)}
       </div>
-      <div class="bg-white rounded-xl shadow-sm p-6">
-        <h3 class="font-semibold text-gray-800 mb-4">Budget vs actual (this month)</h3>
+      <div class="bg-white border border-gray-100 rounded-lg p-6">
+        <h3 class="text-sm font-medium text-gray-500 mb-4">Budget vs actual — this month</h3>
         ${budgetBars(d.budget_alerts)}
       </div>
     </div>
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div class="bg-white rounded-xl shadow-sm p-6">
-        <h3 class="font-semibold text-gray-800 mb-4">Approved spend — last 6 months</h3>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="bg-white border border-gray-100 rounded-lg p-6">
+        <h3 class="text-sm font-medium text-gray-500 mb-4">Approved spend — last 6 months</h3>
         ${spendTrendChart(d.spend_trend)}
       </div>
-      <div class="bg-white rounded-xl shadow-sm p-6">
-        <h3 class="font-semibold text-gray-800 mb-4">Category Breakdown (This Month)</h3>
+      <div class="bg-white border border-gray-100 rounded-lg p-6">
+        <h3 class="text-sm font-medium text-gray-500 mb-4">Category breakdown — this month</h3>
         ${d.category_breakdown.length ? d.category_breakdown.map(c => `
-          <div class="mb-3">
-            <div class="flex justify-between text-sm mb-1"><span>${escapeHtml(c.head_name)}</span><span class="font-medium">${fmt(c.total)}</span></div>
-            <div class="h-2 bg-gray-100 rounded-full"><div class="h-2 bg-blue-500 rounded-full" style="width:${d.expenses.approved_amount ? Math.min((c.total / d.expenses.approved_amount) * 100, 100) : 0}%"></div></div>
+          <div class="mb-3 last:mb-0">
+            <div class="flex justify-between text-sm mb-1"><span class="text-gray-700">${escapeHtml(c.head_name)}</span><span class="font-medium text-gray-900">${fmt(c.total)}</span></div>
+            <div class="h-1.5 bg-gray-100 rounded-full"><div class="h-1.5 bg-blue-500 rounded-full" style="width:${d.expenses.approved_amount ? Math.min((c.total / d.expenses.approved_amount) * 100, 100) : 0}%"></div></div>
           </div>`).join('') : '<p class="text-gray-400 text-sm">No data this month</p>'}
       </div>
     </div>`;
   } else if (api.user.role === 'accounts_head') {
-    html += `<h2 class="text-2xl font-bold text-gray-800 mb-6">Accounts Head Dashboard</h2>
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-      ${statCard('Pending Expenses', d.pending_expenses.count + ' (' + fmt(d.pending_expenses.amount) + ')', 'fa-clock', 'yellow', () => navigateToFiltered('expenses', 'pending'))}
-      ${statCard('Pending Settlements', d.pending_settlements, 'fa-calendar-check', 'blue', () => navigateTo('settlements'))}
-      ${statCard('Pending Petty Cash', d.pending_petty_cash_transactions, 'fa-wallet', 'purple', () => navigateTo('petty-cash'))}
-      ${statCard('Reviewed Today', d.reviewed_today, 'fa-list-check', 'green')}
+    html += `<h2 class="text-xl font-semibold text-gray-900 tracking-tight mb-6">Dashboard</h2>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
+      ${statCard('Pending expenses', d.pending_expenses.count + ' (' + fmt(d.pending_expenses.amount) + ')', 'fa-clock', 'yellow', () => navigateToFiltered('expenses', 'pending'))}
+      ${statCard('Pending settlements', d.pending_settlements, 'fa-calendar-check', 'blue', () => navigateTo('settlements'))}
+      ${statCard('Pending petty cash', d.pending_petty_cash_transactions, 'fa-wallet', 'purple', () => navigateTo('petty-cash'))}
+      ${statCard('Reviewed today', d.reviewed_today, 'fa-list-check', 'green')}
     </div>
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-      <div class="bg-white rounded-xl shadow-sm p-6">
-        <h3 class="font-semibold text-gray-800 mb-4">Needs attention</h3>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="bg-white border border-gray-100 rounded-lg p-6">
+        <h3 class="text-sm font-medium text-gray-500 mb-4">Needs attention</h3>
         ${pendingQueueList(d.pending_queue)}
       </div>
-      <div class="bg-white rounded-xl shadow-sm p-6">
-        <h3 class="font-semibold text-gray-800 mb-4">Pending Expenses for Review</h3>
-        ${d.pending_expenses_list.length ? `<table class="w-full"><thead><tr class="text-left text-xs text-gray-500 border-b"><th class="pb-2">Date</th><th class="pb-2">Employee</th><th class="pb-2">Category</th><th class="pb-2">Amount</th><th class="pb-2">Action</th></tr></thead><tbody>${d.pending_expenses_list.map(e => `
-          <tr class="table-row border-b"><td class="py-3 text-sm">${fmtDate(e.date)}</td><td class="py-3 text-sm">${escapeHtml(e.created_by_name)}</td><td class="py-3 text-sm">${escapeHtml(e.head_name)}</td><td class="py-3 text-sm font-medium">${fmt(e.amount)}</td>
-          <td class="py-3"><button onclick="quickApprove(${e.id})" class="text-green-600 hover:text-green-800 text-sm mr-2"><i class="fas fa-check"></i></button><button onclick="quickReject(${e.id})" class="text-red-600 hover:text-red-800 text-sm"><i class="fas fa-times"></i></button></td></tr>`).join('')}</tbody></table>` : '<p class="text-gray-400 text-sm">No pending expenses</p>'}
+      <div class="bg-white border border-gray-100 rounded-lg p-6">
+        <h3 class="text-sm font-medium text-gray-500 mb-4">Pending expenses for review</h3>
+        ${d.pending_expenses_list.length ? `<table class="w-full"><thead><tr class="text-left text-xs text-gray-500 border-b border-gray-100"><th class="pb-2 font-normal">Date</th><th class="pb-2 font-normal">Employee</th><th class="pb-2 font-normal">Category</th><th class="pb-2 font-normal">Amount</th><th class="pb-2 font-normal">Action</th></tr></thead><tbody>${d.pending_expenses_list.map(e => `
+          <tr class="border-b border-gray-50 last:border-0"><td class="py-2.5 text-sm text-gray-700">${fmtDate(e.date)}</td><td class="py-2.5 text-sm text-gray-700">${escapeHtml(e.created_by_name)}</td><td class="py-2.5 text-sm text-gray-700">${escapeHtml(e.head_name)}</td><td class="py-2.5 text-sm font-medium text-gray-900">${fmt(e.amount)}</td>
+          <td class="py-2.5"><button onclick="quickApprove(${e.id})" class="text-emerald-600 hover:text-emerald-700 text-sm mr-3"><i class="fas fa-check"></i></button><button onclick="quickReject(${e.id})" class="text-red-500 hover:text-red-600 text-sm"><i class="fas fa-times"></i></button></td></tr>`).join('')}</tbody></table>` : '<p class="text-gray-400 text-sm">No pending expenses</p>'}
       </div>
     </div>`;
   } else {
-    html += `<h2 class="text-2xl font-bold text-gray-800 mb-6">My Dashboard</h2>`;
+    html += `<h2 class="text-xl font-semibold text-gray-900 tracking-tight mb-6">Dashboard</h2>`;
 
     if (!d.today_settlement) {
-      html += `<div class="flex items-center gap-3 bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 mb-6">
-        <i class="fas fa-circle-exclamation text-yellow-500"></i>
-        <span class="text-sm text-yellow-800 font-medium">You haven't submitted today's settlement yet.</span>
-        <button onclick="navigateTo('settlements')" class="ml-auto text-sm text-yellow-800 underline">Submit now</button>
+      html += `<div class="flex items-center gap-3 bg-amber-50 border-l-2 border-amber-400 rounded-r-md px-4 py-3 mb-6">
+        <i class="fas fa-circle-exclamation text-amber-500 text-sm"></i>
+        <span class="text-sm text-amber-800">You haven't submitted today's settlement yet.</span>
+        <button onclick="navigateTo('settlements')" class="ml-auto text-sm text-amber-800 hover:text-amber-900">Submit now</button>
       </div>`;
     }
 
-    html += `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    html += `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
       ${statCard('Pending', fmt(d.expenses.pending_amount), 'fa-clock', 'yellow', () => navigateToFiltered('my-expenses', 'pending'))}
       ${statCard('Approved', fmt(d.expenses.approved_amount), 'fa-check-circle', 'green', () => navigateToFiltered('my-expenses', 'approved'))}
       ${statCard('Rejected', fmt(d.expenses.rejected_amount), 'fa-times-circle', 'red', () => navigateToFiltered('my-expenses', 'rejected'))}
-      ${statCard('This Month', fmt(d.month_expenses.amount), 'fa-calendar', 'blue')}
+      ${statCard('This month', fmt(d.month_expenses.amount), 'fa-calendar', 'blue')}
     </div>
-    <div class="bg-white rounded-xl shadow-sm p-6">
-      <h3 class="font-semibold text-gray-800 mb-4">Recent Expenses</h3>
-      ${d.recent_expenses.length ? `<table class="w-full"><thead><tr class="text-left text-xs text-gray-500 border-b"><th class="pb-2">Date</th><th class="pb-2">Category</th><th class="pb-2">Amount</th><th class="pb-2">Status</th></tr></thead><tbody>${d.recent_expenses.map(e => `
-        <tr class="table-row border-b"><td class="py-3 text-sm">${fmtDate(e.date)}</td><td class="py-3 text-sm">${escapeHtml(e.head_name)}</td><td class="py-3 text-sm font-medium">${fmt(e.amount)}</td><td class="py-3">${statusBadge(e.status)}</td></tr>`).join('')}</tbody></table>` : '<p class="text-gray-400 text-sm">No expenses yet. Click "New Expense" to start.</p>'}
+    <div class="bg-white border border-gray-100 rounded-lg p-6">
+      <h3 class="text-sm font-medium text-gray-500 mb-4">Recent expenses</h3>
+      ${d.recent_expenses.length ? `<table class="w-full"><thead><tr class="text-left text-xs text-gray-500 border-b border-gray-100"><th class="pb-2 font-normal">Date</th><th class="pb-2 font-normal">Category</th><th class="pb-2 font-normal">Amount</th><th class="pb-2 font-normal">Status</th></tr></thead><tbody>${d.recent_expenses.map(e => `
+        <tr class="border-b border-gray-50 last:border-0"><td class="py-2.5 text-sm text-gray-700">${fmtDate(e.date)}</td><td class="py-2.5 text-sm text-gray-700">${escapeHtml(e.head_name)}</td><td class="py-2.5 text-sm font-medium text-gray-900">${fmt(e.amount)}</td><td class="py-2.5">${statusBadge(e.status)}</td></tr>`).join('')}</tbody></table>` : '<p class="text-gray-400 text-sm">No expenses yet. Click "New Expense" to start.</p>'}
     </div>`;
   }
 
@@ -285,7 +285,7 @@ async function renderDashboard() {
 }
 
 function statCard(label, value, icon, color, onClick) {
-  const colors = { blue: 'from-blue-500 to-blue-600', green: 'from-green-500 to-green-600', yellow: 'from-yellow-500 to-yellow-600', red: 'from-red-500 to-red-600', purple: 'from-purple-500 to-purple-600' };
+  const chip = { blue: 'bg-blue-50 text-blue-600', green: 'bg-emerald-50 text-emerald-600', yellow: 'bg-amber-50 text-amber-600', red: 'bg-red-50 text-red-600', purple: 'bg-violet-50 text-violet-600' };
   const id = 'stat-' + Math.random().toString(36).slice(2, 9);
   if (onClick) {
     setTimeout(() => {
@@ -293,9 +293,12 @@ function statCard(label, value, icon, color, onClick) {
       if (el) el.addEventListener('click', onClick);
     }, 0);
   }
-  return `<div id="${id}" class="stat-card bg-gradient-to-br ${colors[color]} rounded-xl p-5 text-white${onClick ? ' cursor-pointer hover:brightness-110 transition' : ''}">
-    <div class="flex items-center justify-between mb-3"><span class="text-white/80 text-sm">${label}</span><i class="fas ${icon} text-white/60"></i></div>
-    <p class="text-2xl font-bold">${value}</p>
+  return `<div id="${id}" class="stat-card bg-white border border-gray-100 rounded-lg p-5${onClick ? ' cursor-pointer' : ''}">
+    <div class="flex items-center gap-2 mb-3">
+      <span class="w-7 h-7 rounded-md flex items-center justify-center ${chip[color]}"><i class="fas ${icon} text-xs"></i></span>
+      <span class="text-sm text-gray-500">${label}</span>
+    </div>
+    <p class="text-xl font-semibold text-gray-900 tracking-tight">${value}</p>
   </div>`;
 }
 
@@ -304,13 +307,13 @@ function statCard(label, value, icon, color, onClick) {
 function pendingQueueList(queue) {
   if (!queue || !queue.length) return '<p class="text-gray-400 text-sm">Nothing pending — all caught up.</p>';
   const icons = { expense: 'fa-receipt', settlement: 'fa-calendar-check', petty_cash: 'fa-wallet' };
-  return `<div class="space-y-3">${queue.map(item => `
-    <div class="flex items-center justify-between py-2 border-b last:border-0">
+  return `<div class="divide-y divide-gray-50">${queue.map(item => `
+    <div class="flex items-center justify-between py-2.5 first:pt-0 last:pb-0">
       <div class="flex items-center gap-3">
-        <i class="fas ${icons[item.type] || 'fa-circle'} text-gray-400 w-4 text-center"></i>
-        <div><p class="text-sm font-medium">${escapeHtml(item.person || 'Unknown')} · ${escapeHtml(item.label)}</p><p class="text-xs text-gray-500">${waitingSince(item.created_at)}</p></div>
+        <i class="fas ${icons[item.type] || 'fa-circle'} text-gray-300 w-4 text-center text-sm"></i>
+        <div><p class="text-sm text-gray-700">${escapeHtml(item.person || 'Unknown')} · ${escapeHtml(item.label)}</p><p class="text-xs text-gray-400">${waitingSince(item.created_at)}</p></div>
       </div>
-      <p class="font-semibold text-sm">${fmt(item.amount)}</p>
+      <p class="text-sm font-medium text-gray-900">${fmt(item.amount)}</p>
     </div>`).join('')}</div>`;
 }
 
@@ -328,11 +331,11 @@ function waitingSince(createdAt) {
 function budgetBars(alerts) {
   if (!alerts || !alerts.length) return '<p class="text-gray-400 text-sm">No budgets are close to their limit this month.</p>';
   return alerts.map(b => {
-    const color = b.utilization_pct >= 100 ? 'bg-red-500' : b.utilization_pct >= 90 ? 'bg-yellow-500' : 'bg-green-500';
-    const textColor = b.utilization_pct >= 100 ? 'text-red-600' : b.utilization_pct >= 90 ? 'text-yellow-600' : 'text-green-600';
-    return `<div class="mb-3">
-      <div class="flex justify-between text-sm mb-1"><span>${escapeHtml(b.head_name)}</span><span class="font-medium ${textColor}">${b.utilization_pct}%</span></div>
-      <div class="h-2 bg-gray-100 rounded-full"><div class="h-2 ${color} rounded-full" style="width:${Math.min(b.utilization_pct, 100)}%"></div></div>
+    const color = b.utilization_pct >= 100 ? 'bg-red-500' : b.utilization_pct >= 90 ? 'bg-amber-500' : 'bg-emerald-500';
+    const textColor = b.utilization_pct >= 100 ? 'text-red-600' : b.utilization_pct >= 90 ? 'text-amber-600' : 'text-emerald-600';
+    return `<div class="mb-3 last:mb-0">
+      <div class="flex justify-between text-sm mb-1"><span class="text-gray-700">${escapeHtml(b.head_name)}</span><span class="font-medium ${textColor}">${b.utilization_pct}%</span></div>
+      <div class="h-1.5 bg-gray-100 rounded-full"><div class="h-1.5 ${color} rounded-full" style="width:${Math.min(b.utilization_pct, 100)}%"></div></div>
     </div>`;
   }).join('');
 }
@@ -344,7 +347,7 @@ function spendTrendChart(trend) {
   const max = Math.max(...trend.map(t => t.total), 1);
   return `<div class="flex items-end gap-3" style="height:160px">${trend.map(t => `
     <div class="flex-1 flex flex-col items-center justify-end h-full">
-      <p class="text-xs font-medium text-gray-600 mb-1">${t.total ? fmt(t.total) : ''}</p>
+      <p class="text-xs text-gray-500 mb-1">${t.total ? fmt(t.total) : ''}</p>
       <div class="w-full bg-blue-500 rounded-t" style="height:${Math.max((t.total / max) * 100, t.total > 0 ? 4 : 0)}%"></div>
       <p class="text-xs text-gray-400 mt-2">${monthLabel(t.month)}</p>
     </div>`).join('')}</div>`;
