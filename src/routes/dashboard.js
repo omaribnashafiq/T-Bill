@@ -4,6 +4,91 @@ const { authenticate } = require('../middleware/auth');
 
 const router = express.Router();
 
+// Shared by admin + accounts_head dashboards: which expense heads are over
+// (or close to) budget this month. Reuses the same spend calculation as
+// budgets.js's /summary endpoint rather than duplicating the query logic.
+async function budgetAlerts(currentMonth) {
+  const budgets = await db('budgets')
+    .leftJoin('expense_heads', 'budgets.head_id', 'expense_heads.id')
+    .where('budgets.year_month', currentMonth)
+    .select('budgets.head_id', 'expense_heads.name as head_name', 'budgets.amount as budgeted');
+
+  if (budgets.length === 0) return [];
+
+  const spending = await db('expenses')
+    .where('expenses.status', 'approved')
+    .whereRaw("strftime('%Y-%m', expenses.date) = ?", [currentMonth])
+    .whereIn('expenses.head_id', budgets.map((b) => b.head_id))
+    .select('expenses.head_id', db.raw('SUM(expenses.amount) as spent'))
+    .groupBy('expenses.head_id');
+
+  const spendingMap = {};
+  spending.forEach((s) => { spendingMap[s.head_id] = Number(s.spent); });
+
+  return budgets
+    .map((b) => {
+      const spent = spendingMap[b.head_id] || 0;
+      const budgeted = Number(b.budgeted);
+      return {
+        head_id: b.head_id,
+        head_name: b.head_name,
+        budgeted,
+        spent,
+        utilization_pct: budgeted ? Math.round((spent / budgeted) * 10000) / 100 : 0,
+      };
+    })
+    .filter((b) => b.utilization_pct >= 80)
+    .sort((a, b) => b.utilization_pct - a.utilization_pct);
+}
+
+// Merges pending expenses, settlements, and petty cash transactions into a
+// single "what needs my attention" queue, sorted by how long each item has
+// been waiting — rather than three disconnected badge counts an approver has
+// to check separately.
+async function pendingQueue(limit = 10) {
+  const [expenses, settlements, pettyCash] = await Promise.all([
+    db('expenses')
+      .leftJoin('users', 'expenses.created_by', 'users.id')
+      .leftJoin('expense_heads', 'expenses.head_id', 'expense_heads.id')
+      .where('expenses.status', 'pending')
+      .select(
+        'expenses.id',
+        'expenses.amount',
+        'expenses.created_at',
+        'users.name as person',
+        'expense_heads.name as label'
+      ),
+    db('daily_settlements')
+      .leftJoin('users', 'daily_settlements.employee_id', 'users.id')
+      .where('daily_settlements.status', 'pending')
+      .select(
+        'daily_settlements.id',
+        'daily_settlements.total_expenses as amount',
+        'daily_settlements.created_at',
+        'users.name as person'
+      ),
+    db('petty_cash_transactions')
+      .leftJoin('users', 'petty_cash_transactions.created_by', 'users.id')
+      .where('petty_cash_transactions.status', 'pending')
+      .select(
+        'petty_cash_transactions.id',
+        'petty_cash_transactions.amount',
+        'petty_cash_transactions.created_at',
+        'users.name as person',
+        'petty_cash_transactions.type as label'
+      ),
+  ]);
+
+  const combined = [
+    ...expenses.map((e) => ({ type: 'expense', id: e.id, person: e.person, label: e.label || 'Expense', amount: Number(e.amount), created_at: e.created_at })),
+    ...settlements.map((s) => ({ type: 'settlement', id: s.id, person: s.person, label: 'Settlement', amount: Number(s.amount), created_at: s.created_at })),
+    ...pettyCash.map((p) => ({ type: 'petty_cash', id: p.id, person: p.person, label: p.label === 'dispense' ? 'Petty cash' : 'Petty cash top-up', amount: Number(p.amount), created_at: p.created_at })),
+  ];
+
+  combined.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+  return combined.slice(0, limit);
+}
+
 // GET /api/dashboard — role-based dashboard
 router.get('/', authenticate, async (req, res) => {
   try {
@@ -84,6 +169,22 @@ async function adminDashboard() {
     .groupBy('expense_heads.name')
     .orderBy('total', 'desc');
 
+  // 6-month approved-spend trend, so a single month's snapshot has context
+  const trendMonths = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date();
+    d.setMonth(d.getMonth() - i);
+    trendMonths.push(d.toISOString().slice(0, 7));
+  }
+  const trendRows = await db('expenses')
+    .whereRaw(`strftime('%Y-%m', date) IN (${trendMonths.map(() => '?').join(',')})`, trendMonths)
+    .where('status', 'approved')
+    .select(db.raw("strftime('%Y-%m', date) as month"), db.raw('SUM(amount) as total'))
+    .groupBy(db.raw("strftime('%Y-%m', date)"));
+  const trendMap = {};
+  trendRows.forEach((r) => { trendMap[r.month] = Number(r.total); });
+  const spendTrend = trendMonths.map((m) => ({ month: m, total: trendMap[m] || 0 }));
+
   return {
     expenses: expenseStats,
     month_expenses: monthExpenses,
@@ -93,6 +194,9 @@ async function adminDashboard() {
     users: userStats,
     recent_expenses: recentExpenses,
     category_breakdown: categoryBreakdown,
+    budget_alerts: await budgetAlerts(thisMonth),
+    pending_queue: await pendingQueue(),
+    spend_trend: spendTrend,
   };
 }
 
@@ -132,12 +236,23 @@ async function accountsHeadDashboard(userId) {
     .orderBy('expenses.created_at', 'asc')
     .limit(10);
 
+  // How much this reviewer has cleared today — gives a sense of progress,
+  // not just an ever-present backlog count.
+  const reviewedToday = await db('expenses')
+    .where('approved_by', userId)
+    .whereIn('status', ['approved', 'rejected'])
+    .whereRaw("date(approved_at) = ?", [today])
+    .count('* as count')
+    .first();
+
   return {
     pending_expenses: { count: pendingExpenses.count, amount: pendingExpenses.amount },
     pending_settlements: Number(pendingSettlements.count),
     pending_petty_cash_transactions: Number(pendingPettyTxns.count),
     my_expenses: myExpenses,
     pending_expenses_list: pendingExpensesList,
+    pending_queue: await pendingQueue(),
+    reviewed_today: Number(reviewedToday.count),
   };
 }
 
