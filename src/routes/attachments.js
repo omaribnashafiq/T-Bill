@@ -1,11 +1,9 @@
 ﻿const express = require('express');
-const fs = require('fs');
-const path = require('path');
 const db = require('../db');
 const { authenticate, authorize } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const { log } = require('../db/auditLog');
-const { enqueue } = require('../utils/compressionQueue');
+const cloudinaryUtil = require('../utils/cloudinary');
 
 const router = express.Router();
 
@@ -126,35 +124,16 @@ router.post('/', authenticate, upload.array('files', 5), async (req, res) => {
       }
     }
 
-    const attachments = req.files.map(f => {
-      // Build date-based URL from file path
-      const pathParts = f.path.split(require('path').sep);
-      const uploadsIdx = pathParts.indexOf('uploads');
-      const publicUrl = uploadsIdx >= 0
-        ? '/' + pathParts.slice(uploadsIdx).join('/')
-        : '/uploads/' + f.filename;
-
-      return {
-        entity_type,
-        entity_id: Number(entity_id),
-        file_url: publicUrl,
-        file_type: f.mimetype,
-        uploaded_by: req.user.id,
-      };
-    });
+    const attachments = req.files.map(f => ({
+      entity_type,
+      entity_id: Number(entity_id),
+      file_url: f.cloudinaryUrl,
+      cloudinary_public_id: f.cloudinaryPublicId,
+      file_type: f.mimetype,
+      uploaded_by: req.user.id,
+    }));
 
     const saved = await db('attachments').insert(attachments).returning('*');
-
-    // Enqueue background compression for each file
-    saved.forEach((att, idx) => {
-      enqueue({
-        filePath: req.files[idx].path,
-        mimeType: req.files[idx].mimetype,
-        entityType: entity_type,
-        entityId: Number(entity_id),
-        attachmentId: att.id,
-      });
-    });
 
     await log({
       action: 'upload',
@@ -180,11 +159,8 @@ router.delete('/:id', authenticate, authorize('admin'), async (req, res) => {
       return res.status(404).json({ error: 'Attachment not found.' });
     }
 
-    // Remove file from disk
-    const filePath = path.join(__dirname, '..', '..', attachment.file_url);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
+    // Remove the file from Cloudinary
+    await cloudinaryUtil.destroyAsset(attachment.cloudinary_public_id, attachment.file_type === 'application/pdf' ? 'raw' : 'image');
 
     await db('attachments').where({ id: req.params.id }).del();
 

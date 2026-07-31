@@ -24,24 +24,19 @@ const allowedOrigins = (process.env.CORS_ORIGIN || '').split(',').map(o => o.tri
 app.use(cors(allowedOrigins.length ? { origin: allowedOrigins } : {}));
 app.use(express.json());
 
-// Basic security headers (CSP mitigates stored-XSS blast radius; uploads served as attachments, not inline)
+// Basic security headers (CSP mitigates stored-XSS blast radius)
 app.use((req, res, next) => {
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data:; font-src 'self' https://cdnjs.cloudflare.com; object-src 'none'; base-uri 'self'"
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https://res.cloudinary.com; font-src 'self' https://cdnjs.cloudflare.com; object-src 'none'; base-uri 'self'"
   );
   res.setHeader('X-Content-Type-Options', 'nosniff');
   next();
 });
 
-app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads'), {
-  setHeaders: (res) => {
-    // Force download instead of inline rendering — prevents an uploaded HTML/SVG
-    // file from executing script in the app's origin even if it slipped past the filter.
-    res.setHeader('Content-Disposition', 'attachment');
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-  },
-}));
+// Uploaded files (receipts, screenshots) are stored on Cloudinary, not on
+// local disk — Render's web services use ephemeral disk, so anything written
+// locally would be lost on every restart/redeploy.
 app.use(express.static(path.join(__dirname, '..', 'client')));
 
 // Routes

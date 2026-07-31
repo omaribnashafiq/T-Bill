@@ -3,7 +3,7 @@ const db = require('../db');
 const { authenticate, authorize } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const { log } = require('../db/auditLog');
-const { enqueue } = require('../utils/compressionQueue');
+const cloudinaryUtil = require('../utils/cloudinary');
 
 const router = express.Router();
 
@@ -43,35 +43,17 @@ router.post('/', authenticate, authorize('employee', 'admin'), upload.array('fil
     // Save attachments with dual-write (expense_id + entity_type/entity_id)
     const savedAttachments = [];
     if (req.files && req.files.length > 0) {
-      const attachments = req.files.map((f) => {
-        const pathParts = f.path.split(require('path').sep);
-        const uploadsIdx = pathParts.indexOf('uploads');
-        const publicUrl = uploadsIdx >= 0
-          ? '/' + pathParts.slice(uploadsIdx).join('/')
-          : '/uploads/' + f.filename;
-
-        return {
-          expense_id: expense.id,
-          entity_type: 'expense',
-          entity_id: expense.id,
-          file_url: publicUrl,
-          file_type: f.mimetype,
-          uploaded_by: req.user.id,
-        };
-      });
+      const attachments = req.files.map((f) => ({
+        expense_id: expense.id,
+        entity_type: 'expense',
+        entity_id: expense.id,
+        file_url: f.cloudinaryUrl,
+        cloudinary_public_id: f.cloudinaryPublicId,
+        file_type: f.mimetype,
+        uploaded_by: req.user.id,
+      }));
       const inserted = await db('attachments').insert(attachments).returning('*');
       savedAttachments.push(...inserted);
-
-      // Enqueue background compression for each file
-      inserted.forEach((att, idx) => {
-        enqueue({
-          filePath: req.files[idx].path,
-          mimeType: req.files[idx].mimetype,
-          entityType: 'expense',
-          entityId: expense.id,
-          attachmentId: att.id,
-        });
-      });
     }
 
     // Fetch full expense with relations
@@ -429,7 +411,11 @@ router.delete('/:id', authenticate, authorize('admin'), async (req, res) => {
       return res.status(404).json({ error: 'Expense not found.' });
     }
 
-    // Delete associated attachments
+    // Delete associated attachments (and their remote files on Cloudinary)
+    const attachmentsToRemove = await db('attachments')
+      .where({ expense_id: expense.id })
+      .orWhere({ entity_type: 'expense', entity_id: expense.id });
+    await Promise.all(attachmentsToRemove.map((a) => cloudinaryUtil.destroyAsset(a.cloudinary_public_id, a.file_type === 'application/pdf' ? 'raw' : 'image')));
     await db('attachments').where({ expense_id: expense.id }).del();
     await db('attachments').where({ entity_type: 'expense', entity_id: expense.id }).del();
     // Delete associated notes

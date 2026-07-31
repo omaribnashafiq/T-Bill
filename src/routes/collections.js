@@ -1,10 +1,9 @@
 const express = require('express');
-const path = require('path');
 const db = require('../db');
 const { authenticate, authorize } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const { log } = require('../db/auditLog');
-const { enqueue } = require('../utils/compressionQueue');
+const cloudinaryUtil = require('../utils/cloudinary');
 
 const router = express.Router();
 
@@ -107,34 +106,16 @@ router.post('/', authenticate, authorize('employee', 'admin'), upload.array('fil
     // Save attachments
     const savedAttachments = [];
     if (req.files && req.files.length > 0) {
-      const attachments = req.files.map((f) => {
-        const pathParts = f.path.split(path.sep);
-        const uploadsIdx = pathParts.indexOf('uploads');
-        const publicUrl = uploadsIdx >= 0
-          ? '/' + pathParts.slice(uploadsIdx).join('/')
-          : '/uploads/' + f.filename;
-
-        return {
-          entity_type: 'collection',
-          entity_id: collection.id,
-          file_url: publicUrl,
-          file_type: f.mimetype,
-          uploaded_by: req.user.id,
-        };
-      });
+      const attachments = req.files.map((f) => ({
+        entity_type: 'collection',
+        entity_id: collection.id,
+        file_url: f.cloudinaryUrl,
+        cloudinary_public_id: f.cloudinaryPublicId,
+        file_type: f.mimetype,
+        uploaded_by: req.user.id,
+      }));
       const inserted = await db('attachments').insert(attachments).returning('*');
       savedAttachments.push(...inserted);
-
-      // Enqueue background compression
-      inserted.forEach((att, idx) => {
-        enqueue({
-          filePath: req.files[idx].path,
-          mimeType: req.files[idx].mimetype,
-          entityType: 'collection',
-          entityId: collection.id,
-          attachmentId: att.id,
-        });
-      });
     }
 
     await log({
@@ -241,6 +222,9 @@ router.delete('/:id', authenticate, authorize('admin'), async (req, res) => {
     const collection = await db('collections').where({ id: req.params.id }).first();
     if (!collection) return res.status(404).json({ error: 'Collection not found.' });
 
+    const attachmentsToRemove = await db('attachments').where({ entity_type: 'collection', entity_id: collection.id });
+    await Promise.all(attachmentsToRemove.map((a) => cloudinaryUtil.destroyAsset(a.cloudinary_public_id, a.file_type === 'application/pdf' ? 'raw' : 'image')));
+    await db('attachments').where({ entity_type: 'collection', entity_id: collection.id }).del();
     await db('collections').where({ id: collection.id }).del();
 
     await log({

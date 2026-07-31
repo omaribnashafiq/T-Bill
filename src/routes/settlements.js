@@ -1,9 +1,9 @@
 const express = require('express');
-const path = require('path');
 const db = require('../db');
 const { authenticate, authorize } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 const { log } = require('../db/auditLog');
+const cloudinaryUtil = require('../utils/cloudinary');
 
 const router = express.Router();
 
@@ -25,12 +25,10 @@ router.post('/', authenticate, authorize('employee', 'admin'), upload.single('ba
     }
 
     let bank_screenshot_url = null;
+    let bank_screenshot_public_id = null;
     if (req.file) {
-      const pathParts = req.file.path.split(path.sep);
-      const uploadsIdx = pathParts.indexOf('uploads');
-      bank_screenshot_url = uploadsIdx >= 0
-        ? '/' + pathParts.slice(uploadsIdx).join('/')
-        : `/uploads/${req.file.filename}`;
+      bank_screenshot_url = req.file.cloudinaryUrl;
+      bank_screenshot_public_id = req.file.cloudinaryPublicId;
     }
 
     const [settlement] = await db('daily_settlements')
@@ -41,6 +39,7 @@ router.post('/', authenticate, authorize('employee', 'admin'), upload.single('ba
         total_unspent,
         bank_deposit_amount,
         bank_screenshot_url,
+        bank_screenshot_public_id,
         status: 'pending',
       })
       .returning('*');
@@ -189,6 +188,9 @@ router.delete('/:id', authenticate, authorize('admin'), async (req, res) => {
     const settlement = await db('daily_settlements').where({ id: req.params.id }).first();
     if (!settlement) return res.status(404).json({ error: 'Settlement not found.' });
 
+    if (settlement.bank_screenshot_public_id) {
+      await cloudinaryUtil.destroyAsset(settlement.bank_screenshot_public_id, 'image');
+    }
     await db('daily_settlements').where({ id: settlement.id }).del();
 
     await log({

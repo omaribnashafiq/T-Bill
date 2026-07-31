@@ -1,8 +1,8 @@
 const express = require('express');
-const path = require('path');
 const db = require('../db');
 const { authenticate, authorize } = require('../middleware/auth');
 const upload = require('../middleware/upload');
+const cloudinaryUtil = require('../utils/cloudinary');
 
 const router = express.Router();
 
@@ -148,12 +148,10 @@ router.post('/:id/transactions', authenticate, authorize('employee', 'admin'), u
     }
 
     let receipt_url = null;
+    let receipt_public_id = null;
     if (req.file) {
-      const pathParts = req.file.path.split(path.sep);
-      const uploadsIdx = pathParts.indexOf('uploads');
-      receipt_url = uploadsIdx >= 0
-        ? '/' + pathParts.slice(uploadsIdx).join('/')
-        : `/uploads/${req.file.filename}`;
+      receipt_url = req.file.cloudinaryUrl;
+      receipt_public_id = req.file.cloudinaryPublicId;
     }
 
     const [transaction] = await db('petty_cash_transactions')
@@ -164,6 +162,7 @@ router.post('/:id/transactions', authenticate, authorize('employee', 'admin'), u
         amount,
         explanation,
         receipt_url,
+        receipt_public_id,
         head_id: head_id || null,
         status: 'pending',
         created_by: req.user.id,
